@@ -16,7 +16,7 @@ FilePathReco="/home/bishnu/EIC/Data/hepmc/"
 Gev_To_MeV=1000
 PathToPlot='/home/bishnu/UCR_EIC/Plots/hepmc/'
 FIT_SIGMA=3
-### XY Distribution 
+### FUNCTION FOR PLOTTING THE XY Distribution 
 def XY_plot2D(X,Y,energy_plot, particle):
     print(energy_plot)
     PosRecoX=X
@@ -44,7 +44,7 @@ def XY_plot2D(X,Y,energy_plot, particle):
 
 
 
-
+## FUNCTION FOR PLOTTING ONE DIMENSION HISTOGRAM OF GIVEN VARIABLE
 def distribution_1D(variable,title,energy_plot,particle):
         
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
@@ -101,7 +101,8 @@ def ID_Plot(id,particle):
                  
     plt.show()
 
-    
+
+### DEFINATION OF GAUSSIAN AND LINEAR FUNCTION FOR FITTING    
 #def gaussian(x, amp, mean, sigma):
 #    return amp * np.exp( -(x - mean)**2 / (2*sigma**2) )
 
@@ -111,6 +112,10 @@ def gaussian(x, amp, mean, sigma):
 def linear_fit(xl,slope,intercept):
     return (slope*xl)+intercept
 
+
+
+## FUNCTION TO FIT THE ENERGY DISTRIBUION WITH GAUSSIAN AND DETERMINE THE MEAN,SIGMA
+## FITTING RANGE WITHIN +-3 SIGMA AND FOR LEAKAGE EVENTS BELOW 3SIGMA ARE COUNTED
 def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     #fig = plt.figure( figsize=(6, 4))
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
@@ -129,15 +134,12 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     binscenters = np.array([0.5 * (bins[i] + bins[i+1]) for i in range(len(bins)-1)])
     #print (count)
 
-   
-
-
-
+    ## CHOOSE THE DATA POINTS WITHIN GIVEN SIGMAS FOR FITTING
     mask=(binscenters>(mean_guess-FIT_SIGMA*sigma_guess)) & (binscenters<(mean_guess+FIT_SIGMA*sigma_guess))
     error_counts=np.sqrt(count)
     error_counts=np.where(error_counts==0,1,error_counts)
     
-    #count,sigma=error_counts
+    # PARAMETER BOUNDS ARE NOT USED FOR NOW
     param_bounds=([-np.inf,-np.inf,-np.inf], [np.inf,np.inf,np.inf])
     popt, pcov = curve_fit(gaussian, binscenters[mask], count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
         
@@ -151,7 +153,7 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     mean=popt[1]
     std=popt[2]
 
-    
+    ### CHECK THE GOODNESS OF THE FIT
     chisq=np.sum(((count[mask]-gaussian(binscenters[mask],popt[0],mean,std))/error_counts[mask])**2)
     ss_res=np.sum((count-gaussian(binscenters,popt[0],mean,std))**2)
     ss_tot=np.sum((count-np.mean(count))**2)
