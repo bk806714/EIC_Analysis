@@ -15,7 +15,15 @@ import matplotlib.lines as mlines
 import matplotlib.colors as mcolors
 
 Gev_To_MeV=1000
-PathToPlot='/home/bishnu/UCR_EIC/Plots/hepmc/'
+working_dir=os.getcwd()
+new_dir="Plots"#'/home/bishnu/UCR_EIC/Plots/hepmc/'
+try:
+    os.makedirs(f"{working_dir}/{new_dir}",exist_ok=True)
+except OSError:
+    print("Directory creation Error "%new_dir)
+else:
+    print("Directory %s is created"%new_dir)
+PathToPlot="./"+ new_dir  #Replace with your own variation! 
 FIT_SIGMA=3
 xrange=350
 ### FUNCTION FOR PLOTTING THE XY Distribution
@@ -28,7 +36,8 @@ def XY_plot2D(X,Y,energy_plot, particle):
     PosRecoY=Y
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
     #hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),gridsize=50, cmap='viridis')
-    hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),gridsize=100, extent=(-xrange,xrange,-xrange,xrange))
+    #hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),gridsize=100, extent=(-xrange,xrange,-xrange,xrange))
+    hb=ax.hexbin(PosRecoX,PosRecoY,gridsize=100, extent=(-xrange,xrange,-xrange,xrange))
 
     cb = fig.colorbar(hb, label='hits')
     if particle=='pi-':
@@ -71,7 +80,33 @@ def plot2D_energy_time(time,ene,energy_plot, particle,MIP):
     plt.savefig(f"{PathToPlot}{FigName}")
     plt.show()
 
+def hcal_hcali_plot2D_energy(X,Y,energy_plot, particle):
+    print(energy_plot)
+    xrange=100
+    PosRecoX=X
+    PosRecoY=Y
+    fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
+    #hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),gridsize=50, cmap='viridis')
+    
+    hb=ax.hexbin(PosRecoX,PosRecoY,gridsize=25, extent=(0,xrange,0,xrange))
 
+
+    cb = fig.colorbar(hb, label='counts')
+    if particle=='pi-':
+        greek_particle='$\pi^{-}$'
+    elif particle=='e-':
+        greek_particle='$e^-$'
+    else: print("You forgot to pick the particle")
+    title='{0} GeV {1}'.format(energy_plot,greek_particle)
+    plt.xlabel('HCali Energy (GeV)')
+    #plt.xlim(-50,30)
+    plt.title(title)
+
+    plt.ylabel('HCal energy')
+    FigName='Energy distribution_{0}GeV_{1}.png'.format(energy_plot,particle)
+    print('before show')
+    plt.savefig(f"{PathToPlot}{FigName}")
+    plt.show()
     
 def XY_plot2D_energy(X,Y,ene,energy_plot, particle):
     print(energy_plot)
@@ -79,7 +114,8 @@ def XY_plot2D_energy(X,Y,ene,energy_plot, particle):
     PosRecoY=Y
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
     #hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),gridsize=50, cmap='viridis')
-    hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),C=ak.flatten(ene),gridsize=50, extent=(-xrange,xrange,-xrange,xrange))
+    #hb=ax.hexbin(ak.flatten(PosRecoX),ak.flatten(PosRecoY),C=ak.flatten(ene),gridsize=50, extent=(-xrange,xrange,-xrange,xrange))
+    hb=ax.hexbin(PosRecoX,PosRecoY,C=ene,gridsize=50, extent=(-xrange,xrange,-xrange,xrange))
 
     cb = fig.colorbar(hb, label='energy')
     if particle=='pi-':
@@ -123,10 +159,10 @@ def distribution_1D(variable,title,energy_plot,particle):
 
     elif title =='time':
         MinRange=0
-        MaxRange=500
+        MaxRange=300
         x_title='time (ns)'
     else: print('PLEASE GIVE RIGHT TITLE')
-    ax.hist(ak.flatten(variable),bins=100, range=(MinRange,MaxRange),color='r', linewidth='3')
+    ax.hist(ak.flatten(variable),bins=100, range=(MinRange,MaxRange),color='r', linewidth='3', histtype='step')
     #ax.hist(energy,bins=100, range=(MinRange,MaxRange),color='b',histtype='step',linewidth='3')#
     if particle=='pi-':
         greek_particle='$\pi^{-}$'
@@ -179,23 +215,50 @@ def linear_fit(xl,slope,intercept):
 
 ## FUNCTION TO FIT THE ENERGY DISTRIBUION WITH GAUSSIAN AND DETERMINE THE MEAN,SIGMA
 ## FITTING RANGE WITHIN +-3 SIGMA AND FOR LEAKAGE EVENTS BELOW 3SIGMA ARE COUNTED
-def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
+def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage,wt):
+    if wt=='on':
+        print("I am wt")
+        sampling_fraction_hcali=0.0098*1000 #(GeV-1) old val 0.0092
+        sampling_fraction_hcal=0.022*1000  #(GeV-1) old val 0.0215
+        max_range=150
+        xtitle='Energy (GeV)'
+        ytitle='Count'
+        nbins=75
+        steps=20
+    else:
+        sampling_fraction_hcali=1 #(GeV-1)
+        sampling_fraction_hcal=1  #(GeV-1)
+        max_range=2500
+        xtitle='Energy (GeV)'
+        ytitle='Count'
+        nbins=250
+        steps=200
+
+    
     ## Differenciate between energy or theta/etas on y axis
+    greek_particle=get_greek_particle(particle)
     if energy_plot<5:
         eta=get_eta(energy_plot)
-        xtitle='$\eta*={0:.2f}$'.format(eta)
+        title_head=r'$\eta*$={0:.2f}'.format(eta)
+       
     elif energy_plot>5:    
          eta=energy_plot
-         xtitle='Energy = {0} GeV'.format(eta)
+         title_head='{0}, Energy = {1} GeV'.format(greek_particle,eta)
     else:
         print('IF ENERGY IS LESS THAN 5 GeV THAN MAKE SURE THIS TO CHANGE')
-    
+    #print('xxxxxxxxxxxxxxxxxxxxxx',title_head)
     #fig = plt.figure( figsize=(6, 4))
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
     ene_good=good_energy
 
     
-    ene_total = ak.sum(ene_good,axis=-1)
+    ene_total_temp = np.sum(ene_good,axis=-1)
+    ene_total = np.divide(ene_total_temp,sampling_fraction_hcali)
+    
+    #ene_total=np.add(ene_total_hcal,ene_total_hinsert)
+    
+    
+    #ene_total = ak.sum(ene_good,axis=-1)
 
     ene_average = ak.mean(ene_good,axis=-1)
     #ene_nhits = ak.num(ene_good)
@@ -203,11 +266,18 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
 
     mean_guess=np.mean(ene_total)
     sigma_guess=np.std(ene_total)
-    nbins=400
-    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(0,1500),label='HCAL',color='b',linewidth=8)#histtype='step'            
+    
+    
+   
+    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(0,max_range),label='HCAL',color='b',linewidth=8)#histtype='step'            
     binscenters = np.array([0.5 * (bins[i] + bins[i+1]) for i in range(len(bins)-1)])
+    
+    #plt.show()
+    #return 1
     #print (count)
     
+    ax.set_xlabel(xtitle)
+    ax.set_ylabel("Entries")
     ## CHOOSE THE DATA POINTS WITHIN GIVEN SIGMAS FOR FITTING
     mask=(binscenters>(mean_guess-FIT_SIGMA*sigma_guess)) & (binscenters<(mean_guess+FIT_SIGMA*sigma_guess))
     error_counts=np.sqrt(count)
@@ -215,16 +285,16 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     
     # PARAMETER BOUNDS ARE NOT USED FOR NOW
     param_bounds=([-np.inf,-np.inf,-np.inf], [np.inf,np.inf,np.inf])
-    popt, pcov = curve_fit(gaussian, binscenters[mask], count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
+    popt, pcov = curve_fit(gaussian,binscenters[mask],count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
         
     ax.plot(binscenters[mask], gaussian(binscenters[mask], *popt), color='red', linewidth=2.5, label=r'F')
     
     #ax.set_title("Energy = {0} GeV ".format(energy_plot))
-    ax.set_title(xtitle)
+    #ax.set_title(title_head)
     
     #ax.set_title("Energy = {0} GeV, $\eta$=3.7".format(energy_plot))
-    ax.xaxis.set_major_locator(MultipleLocator(400))
-    ax.set_xlabel("Event energy (MeV)")
+    ax.xaxis.set_major_locator(MultipleLocator(steps))
+    ax.set_xlabel(xtitle)
     ax.set_ylabel("Entries")
     FigName='Fit_SimEnergy_{0}_{1}.png'.format(energy_plot,particle)
 
@@ -232,23 +302,7 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     mean=popt[1]
     std=popt[2]
     
-    '''
-    ### CHECK THE GOODNESS OF THE FIT
-    chisq=np.sum(((count[mask]-gaussian(binscenters[mask],popt[0],mean,std))/error_counts[mask])**2)
-    ss_res=np.sum((count-gaussian(binscenters,popt[0],mean,std))**2)
-    ss_tot=np.sum((count-np.mean(count))**2)
-    R2=1-(ss_res/ss_tot)
-    
-                  
-                  
-
-    ##### PRINT CHI SQUARE ON THE FITTED PLOT ##############
-    print('R2',R2)
-    ndf=np.count_nonzero(count)-2
-    #ndf=len(count[mask])-2
-    #print(count)
-    #plt.figtext(0.15,0.8,"$\chi^2/ndf$={0:.2f}/{1}".format(chisq,ndf),fontweight='bold',fontsize=40)
-    '''
+  
     
     
     #errors=np.sqrt(np.diag(pcov))
@@ -281,13 +335,17 @@ def get_resolution(good_energy,energy_plot, particle,Sigma_For_leakage):
     leak_per= '{0:.3f}'.format(leak_per)
     leak_per_error='{0:.4f}'.format(leak_per_error)
     
-    resolution = '{0:.5f}'.format(resolution)
+    resolution = '{0:.2f}'.format(resolution)
     resolution_error ='{0:.4f}'.format(resolution_error)
     
     ####### PRINT THE VERTICLE LINE WITH 2 SIGMA ################    
     #ax.vlines([two_sig_threshold,  two_sig_threshold],0, np.max(count),linestyles='dashed', colors='m', linewidth=5)
    
- 
+    ratio_ene=float(mean)/float(energy_plot)
+    ratio_ene='{0:.2f}'.format(ratio_ene)
+    ratio_ene=float(ratio_ene)
+    ax.text(80,250,"Resolution={0}" .format(resolution))
+    ax.text(80,300,r'$\frac{Pred_{E}}{Truth_{E}}$ =' + '{0:.2f}'.format(ratio_ene))
     #ax.tick_params('both', length=20, width=2, which='major')
     #ax.tick_params('both', length=10, width=1, which='minor')
     plt.savefig(f"{PathToPlot}{FigName}")
@@ -304,6 +362,8 @@ def plot_resolution(energies,particle,means, stds, mean_errors, std_errors, reso
     resolutions=np.multiply(resolutions,100)
     print(resolutions)
     resolution_errors=np.multiply(resolution_errors,100)
+    
+    
     ax.errorbar(energies,resolutions, resolution_errors,color="red",marker='o',markersize=20,label='Reconstructed')
     #ax.plot(energies,resolutions, color="blue",marker='*',label="Generated")
     ax.set_xlabel('Energy (GeV)')
@@ -451,6 +511,97 @@ def read_rootfile(fraction,FilePathReco,ienergy,theta,particle,Time_Threshold,En
     ene_good=ene[mask]
      
     return ene,time,PosRecoX,PosRecoY,PosRecoZ,mass,mom,energy_gen,phi,ene_good
+
+
+
+#-----------------------------------------------------------------------------------
+
+
+def read_rootfile_ECAL(fileindex,fraction,FilePathReco,ienergy,theta,particle,Time_Threshold,Energy_Threshold):
+    #FileName="insert_reco_{0}_{1}GeV_theta_{2}deg.edm4hep.root".format(particle,ienergy,theta)
+    FileName="insert_reco_{0}_{1}GeV_theta_{2}{3}.edm4hep.root".format(particle,ienergy,theta,fileindex)
+    events=ur.open(f"{FilePathReco}{FileName}:events")
+    total_Events=events.num_entries
+    event_cut=total_Events/fraction
+    print('HELLO JELLO', total_Events)
+    #events_cut=
+    events.keys()
+    arrays = events.arrays(entry_start=0,entry_stop=event_cut)
+    #ene = Gev_To_MeV*(ak.flatten(arrays['EcalEndcapPHitsReco.energy'][:])) # in Mev
+    ene = (arrays['EcalEndcapPHitsReco.energy'][:]) # in Mev
+    
+    time = (arrays['EcalEndcapPHitsReco.time'][:]) # in ns
+    #time = (ak.flatten(arrays['EcalEndcapPHitsReco.time'][:])) # in ns
+    PosRecoX = (arrays['EcalEndcapPHitsReco.position.x'])/10.0
+    PosRecoY = (arrays['EcalEndcapPHitsReco.position.y'])/10.0
+    PosRecoZ= (arrays['EcalEndcapPHitsReco.position.z'])/10.0
+    
+    
+    cut_primary = arrays["MCParticles.generatorStatus"]==1
+    px = arrays['MCParticles.momentum.x'][cut_primary]
+    py = arrays['MCParticles.momentum.y'][cut_primary]
+    pz = arrays['MCParticles.momentum.z'][cut_primary]
+    mass = arrays["MCParticles.mass"][cut_primary]
+    ID=arrays['MCParticles.PDG']#[cut_primary]
+    
+    #Calculate generated primary particle properties
+    mom = np.sqrt(px**2+py**2+pz**2)
+    energy_gen = np.sqrt(mom**2+mass**2)
+    #fig = plt.figure( figsize=(8, 6))
+    phi = np.arctan2(py,px)
+
+
+    mask=(ene>Energy_Threshold)  & (time<Time_Threshold) & (ene<1e10)
+    ene_good=ene[mask]
+    
+    return ene,time,PosRecoX,PosRecoY,PosRecoZ,mass,mom,energy_gen,phi,ene_good
+
+### READS ECAL_INSERT WITH MIXTURE OF TUNGSTEN AND STEEL
+def read_rootfile_ECAL_Insert(fileindex,fraction,FilePathReco,ienergy,theta,particle,Time_Threshold,Energy_Threshold):
+    FileName="insert_reco_{0}_{1}GeV_theta_{2}{3}.edm4hep.root".format(particle,ienergy,theta,fileindex)
+    events=ur.open(f"{FilePathReco}{FileName}:events")
+    total_Events=events.num_entries
+    event_cut=total_Events/fraction
+    print('HELLO JELLO', total_Events)
+    #events_cut=
+    events.keys()
+    arrays = events.arrays(entry_start=0,entry_stop=event_cut)
+    ene = (arrays['EcalEndcapPInsertHitsReco.energy'][:]) # in Mev
+    
+    time = (arrays['EcalEndcapPInsertHitsReco.time'][:]) # in ns
+    #time = (ak.flatten(arrays['EcalEndcapPInsertHitsReco.time'][:])) # in ns
+    PosRecoX = (arrays['EcalEndcapPInsertHitsReco.position.x'])/10.0
+    PosRecoY = (arrays['EcalEndcapPInsertHitsReco.position.y'])/10.0
+    PosRecoZ= (arrays['EcalEndcapPInsertHitsReco.position.z'])/10.0
+
+    
+    cut_primary = arrays["MCParticles.generatorStatus"]==1
+    px = arrays['MCParticles.momentum.x'][cut_primary]
+    py = arrays['MCParticles.momentum.y'][cut_primary]
+    pz = arrays['MCParticles.momentum.z'][cut_primary]
+    mass = arrays["MCParticles.mass"][cut_primary]
+    ID=arrays['MCParticles.PDG']#[cut_primary]
+    
+    #Calculate generated primary particle properties
+    mom = np.sqrt(px**2+py**2+pz**2)
+    energy_gen = np.sqrt(mom**2+mass**2)
+    #fig = plt.figure( figsize=(8, 6))
+    phi = np.arctan2(py,px)
+
+
+    mask=(ene>Energy_Threshold)  & (time<Time_Threshold) & (ene<1e10)
+    ene_good=ene[mask]
+     
+    return ene,time,PosRecoX,PosRecoY,PosRecoZ,mass,mom,energy_gen,phi,ene_good
+
+
+##-----------------------------------------------------------------------------------
+
+
+
+
+
+
 
 def res_comp_hole_nohole(energies,condition,el_resolutions,el_resolutions_errors, el_resolutions_NH,el_resolutions_errors_NH):
 
@@ -663,14 +814,27 @@ def read_rootfile_HCAL(fileindex,fraction,FilePathReco,ienergy,theta,particle,Ti
 
 
 
-def get_resolution_hcalall(good_energy_hcal,good_energy_hinsert,energy_plot, particle,Sigma_For_leakage):
-    
+def get_resolution_hcalall(good_energy_hcal,good_energy_hinsert,energy_plot, itheta,particle,Sigma_For_leakage,wt):
+    if wt=='on':
+        sampling_fraction_hcal=0.022*1000
+        sampling_fraction_hcali=0.0098*1000
+        max_range=150
+        nbins=75
+        steps=20
+        
+    else:
+        sampling_fraction_hcal=1
+        sampling_fraction_hcali=1
+        nbins=150
+        max_range=1500
+        steps=200
+        
     if energy_plot<5:
         eta=get_eta(energy_plot)
-        xtitle='$\eta*={0:.2f}$'.format(eta)
+        xtitle='$\eta*={0:.2f}$, '.format(eta)
     elif energy_plot>5:    
          eta=energy_plot
-         xtitle='Energy = {0} GeV'.format(eta)
+         xtitle='Energy = {0} GeV, $\u03B8$={1:.2f} deg'.format(eta,itheta)
     else:
         print('IF ENERGY IS LESS THAN 5 GeV THAN MAKE SURE THIS TO CHANGE')
     
@@ -678,21 +842,23 @@ def get_resolution_hcalall(good_energy_hcal,good_energy_hinsert,energy_plot, par
     fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
     ene_good=good_energy_hcal
     
+    ene_total_insert_temp = ak.sum(good_energy_hinsert,axis=-1)
+    ene_total_insert_only = np.divide(ene_total_insert_temp,sampling_fraction_hcali)
     
-    ene_total_hcal = ak.sum(good_energy_hcal,axis=-1)
-    ene_total_hinsert = ak.sum(good_energy_hinsert,axis=-1)
-    ene_total=np.add(ene_total_hcal,ene_total_hinsert)
-    #ene_average = ak.mean(ene_good,axis=-1)
-    #ene_nhits = ak.num(ene_good)
-    #HCAL_total=HCAL_total[0:90]
-
-    # print(good_energy_hcal,'       ',good_energy_hinsert)
-    #print(ene_total_hcal,' insert  ',ene_total_hinsert,' total ',ene_total)
+    
+    ene_total_hcal_temp = ak.sum(good_energy_hcal,axis=-1)
+    ene_total_hcal_only = np.divide(ene_total_hcal_temp,sampling_fraction_hcal)
+                
+               
+                
+    ## Total        
+    ene_total=np.add(ene_total_hcal_only,ene_total_insert_only)
+  
     
     mean_guess=np.mean(ene_total)
     sigma_guess=np.std(ene_total)
-    nbins=200
-    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(0,1200),label='HCAL',linewidth='3',color='b')
+    
+    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(0,max_range),label='HCAL',linewidth='3',color='b')
     binscenters = np.array([0.5 * (bins[i] + bins[i+1]) for i in range(len(bins)-1)])
     #print (count)
 
@@ -705,11 +871,11 @@ def get_resolution_hcalall(good_energy_hcal,good_energy_hinsert,energy_plot, par
     param_bounds=([-np.inf,-np.inf,-np.inf], [np.inf,np.inf,np.inf])
     popt, pcov = curve_fit(gaussian, binscenters[mask], count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
         
-    ax.plot(binscenters[mask], gaussian(binscenters[mask], *popt), color='red', linewidth=2.5, label=r'F')
+    ax.plot(binscenters[mask], gaussian(binscenters[mask], *popt), color='red',linestyle='dashed', linewidth=2.5, label=r'F')
     #ax.set_title("Energy = {0} GeV ".format(energy_plot))
     ax.set_title(xtitle)
-    ax.xaxis.set_major_locator(MultipleLocator(400))
-    ax.set_xlabel("Event energy (MeV)")
+    ax.xaxis.set_major_locator(MultipleLocator(steps))
+    ax.set_xlabel("Event energy (MeV)",fontsize=30)
     FigName='Fit_SimEnergy_{0}_{1}.png'.format(energy_plot,particle)
     
     ### GET MEAN SIGMA AND ERRORS FROM FIT
@@ -748,12 +914,15 @@ def get_resolution_hcalall(good_energy_hcal,good_energy_hinsert,energy_plot, par
     leak_per= '{0:.3f}'.format(leak_per)
     leak_per_error='{0:.4f}'.format(leak_per_error)
     
-    resolution = '{0:.5f}'.format(resolution)
+    resolution = '{0:.2f}'.format(resolution)
     resolution_error ='{0:.4f}'.format(resolution_error)
     
-    ####### PRINT THE VERTICLE LINE WITH 2 SIGMA ################    
-    #ax.vlines([two_sig_threshold,  two_sig_threshold],0, np.max(count),linestyles='dashed', colors='m', linewidth=5)
-   
+    
+    ratio_ene=float(mean)/float(energy_plot)
+    ratio_ene='{0:.2f}'.format(ratio_ene)
+    ratio_ene=float(ratio_ene)
+    ax.text(80,250,"Resolution={0}" .format(resolution))
+    ax.text(80,300,r'$\frac{Pred_{E}}{Truth_{E}}$ =' + '{0:.2f}'.format(ratio_ene))
  
     #ax.tick_params('both', length=20, width=2, which='major')
     #ax.tick_params('both', length=10, width=1, which='minor')
@@ -883,3 +1052,268 @@ def get_greek_particle(particle):
     else:
         print("You forgot to pick the particle")
     return greek_particle
+
+
+
+### THIS IS THE SUM WITH THE WEIGHT SUM OF HCAL AND HCALI
+def get_resolution_hcalall_weighted(wt,good_energy_hcal,good_energy_hinsert,energy_plot, particle,Sigma_For_leakage):
+    if wt=='on':
+        sampling_fraction_hcali=0.0098*1000 #(GeV-1) old val 0.0092
+        sampling_fraction_hcal=0.022*1000  #(GeV-1) old val 0.0215
+        max_range=150
+        nbins=400
+        xlabel="Energy (GeV)"
+        total_xdiv=5
+    else:
+        sampling_fraction_hcali=1 #(GeV-1)
+        sampling_fraction_hcal=1  #(GeV-1)
+        max_range=1300
+        nbins=200
+        xlabel="Energy (MeV)"
+        total_xdiv=4
+    min_range=0
+    xdiv=int((max_range-min_range)/total_xdiv)
+    if energy_plot<5:
+        eta=get_eta(energy_plot)
+        xtitle='$\eta*={0:.2f}$'.format(eta)
+    elif energy_plot>5:    
+         eta=energy_plot
+         xtitle='Energy = {0} GeV'.format(eta)
+    else:
+        print('IF ENERGY IS LESS THAN 5 GeV THAN MAKE SURE THIS TO CHANGE')
+    
+    #fig = plt.figure( figsize=(6, 4))
+    fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
+       
+    
+    ene_total_hcal_temp = np.sum(good_energy_hcal,axis=-1)
+    ene_total_hcal=np.divide(ene_total_hcal_temp,sampling_fraction_hcal)
+    
+    ene_total_hinsert_temp = np.sum(good_energy_hinsert,axis=-1)
+    ene_total_hinsert = np.divide( ene_total_hinsert_temp,sampling_fraction_hcali)
+    
+    ene_total=np.add(ene_total_hcal,ene_total_hinsert)
+    #ene_average = ak.mean(ene_good,axis=-1)
+    #ene_nhits = ak.num(ene_good)
+    #HCAL_total=HCAL_total[0:90]
+
+    # print(good_energy_hcal,'       ',good_energy_hinsert)
+    #print(ene_total_hcal,' insert  ',ene_total_hinsert,' total ',ene_total)
+    
+    mean_guess=np.mean(ene_total)
+    sigma_guess=np.std(ene_total)
+    
+    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(min_range,max_range),label='HCAL',linewidth='3',color='b')
+    binscenters = np.array([0.5 * (bins[i] + bins[i+1]) for i in range(len(bins)-1)])
+    #print (count)
+    
+    ## CHOOSE THE DATA POINTS WITHIN GIVEN SIGMAS FOR FITTING
+    mask=(binscenters>(mean_guess-FIT_SIGMA*sigma_guess)) & (binscenters<(mean_guess+FIT_SIGMA*sigma_guess))
+    error_counts=np.sqrt(count)
+    error_counts=np.where(error_counts==0,1,error_counts)
+    
+    # PARAMETER BOUNDS ARE NOT USED FOR NOW
+    param_bounds=([-np.inf,-np.inf,-np.inf], [np.inf,np.inf,np.inf])
+    popt, pcov = curve_fit(gaussian, binscenters[mask], count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
+      
+    ax.plot(binscenters[mask], gaussian(binscenters[mask], *popt), color='red', linewidth=2.5, label=r'F')
+    #ax.set_title("Energy = {0} GeV ".format(energy_plot))
+    ax.set_title(xtitle)
+    ax.xaxis.set_major_locator(MultipleLocator(xdiv))
+    ax.set_xlabel(xlabel)
+    FigName='Fit_SimEnergy_{0}_{1}.png'.format(energy_plot,particle)
+    
+    ### GET MEAN SIGMA AND ERRORS FROM FIT
+    mean=popt[1]
+    std=popt[2]
+   
+
+    
+    #errors=np.sqrt(np.diag(pcov))
+    mean_error=np.sqrt(pcov[1, 1])
+    std_error=np.sqrt(pcov[2, 2])
+    #print(mean_guess,'   sigma   ', sigma_guess,' actual mean ', mean,  'actual std',std)  
+    ### GET THE BIN WITH VALUE WHERE IT LIES mEAN -3SIGMA
+    two_sig_threshold=mean-(Sigma_For_leakage*std)
+    bin_2sig=np.digitize(two_sig_threshold,bins)
+    
+    ### GET FRACTION OF lEAKAGE
+    num_leak=np.sum(count[0:bin_2sig])
+    deno_leak=np.sum(count)
+    leak_per=(num_leak/deno_leak)*100
+    if leak_per==0:
+        leak_per_error=0
+    else:    
+        leak_per_error=np.sqrt((np.sqrt(num_leak)/num_leak)**2 + (np.sqrt(deno_leak)/deno_leak)**2)*leak_per
+
+    resolution=(std/mean)
+    resolution_error=(np.sqrt((std_error/std)**2 + (mean_error/mean)**2))*resolution
+        
+    #mean=f'{mean:.2f}'
+    mean=format(mean,'.2f')
+    mean_error='{0:.3f}'.format(mean_error)
+    
+    std= '{0:.2f}'.format(std)
+    std_error= '{0:.3f}'.format( std_error)
+
+    leak_per= '{0:.3f}'.format(leak_per)
+    leak_per_error='{0:.4f}'.format(leak_per_error)
+    
+    resolution = '{0:.5f}'.format(resolution)
+    resolution_error ='{0:.4f}'.format(resolution_error)
+    
+    ####### PRINT THE VERTICLE LINE WITH 2 SIGMA ################    
+    #ax.vlines([two_sig_threshold,  two_sig_threshold],0, np.max(count),linestyles='dashed', colors='m', linewidth=5)
+   
+ 
+    #ax.tick_params('both', length=20, width=2, which='major')
+    #ax.tick_params('both', length=10, width=1, which='minor')
+    plt.savefig(f"{PathToPlot}{FigName}")
+    plt.show()
+    return mean, std, mean_error, std_error, leak_per,leak_per_error,resolution,resolution_error
+
+
+
+
+#####################################
+def get_resolution_hcal_only(good_energy,energy_plot, particle,Sigma_For_leakage,wt):
+    if wt=='on':
+        print("I am wt")
+        sampling_fraction_hcali=0.0098*1000 #(GeV-1) old val 0.0092
+        sampling_fraction_hcal=0.022*1000  #(GeV-1) old val 0.0215
+        max_range=150
+        xtitle='Energy (GeV)'
+        ytitle='Count'
+        nbins=75
+        steps=20
+    else:
+        sampling_fraction_hcali=1 #(GeV-1)
+        sampling_fraction_hcal=1  #(GeV-1)
+        max_range=2500
+        xtitle='Energy (GeV)'
+        ytitle='Count'
+        nbins=250
+        steps=200
+
+    
+    ## Differenciate between energy or theta/etas on y axis
+    greek_particle=get_greek_particle(particle)
+    if energy_plot<5:
+        eta=get_eta(energy_plot)
+        title_head=r'$\eta*$={0:.2f}'.format(eta)
+       
+    elif energy_plot>5:    
+         eta=energy_plot
+         title_head='{0}, Energy = {1} GeV'.format(greek_particle,eta)
+    else:
+        print('IF ENERGY IS LESS THAN 5 GeV THAN MAKE SURE THIS TO CHANGE')
+    #print('xxxxxxxxxxxxxxxxxxxxxx',title_head)
+    #fig = plt.figure( figsize=(6, 4))
+    fig,ax = plt.subplots(1,1, figsize=(16, 12),sharex=True,sharey=True)
+    ene_good=good_energy
+
+    
+    ene_total_temp = np.sum(ene_good,axis=-1)
+    ene_total = np.divide(ene_total_temp,sampling_fraction_hcal)
+    
+   
+
+    ene_average = ak.mean(ene_good,axis=-1)
+    #ene_nhits = ak.num(ene_good)
+    #HCAL_total=HCAL_total[0:90]
+
+    mean_guess=np.mean(ene_total)
+    sigma_guess=np.std(ene_total)
+    
+    
+   
+    count, bins,_= plt.hist(np.array(ene_total),bins=nbins,alpha=0.5,range=(0,max_range),label='HCAL',color='b',linewidth=8)#histtype='step'            
+    binscenters = np.array([0.5 * (bins[i] + bins[i+1]) for i in range(len(bins)-1)])
+    
+    #plt.show()
+    #return 1
+    #print (count)
+    
+    ax.set_xlabel(xtitle)
+    ax.set_ylabel("Entries")
+    ## CHOOSE THE DATA POINTS WITHIN GIVEN SIGMAS FOR FITTING
+    mask=(binscenters>(mean_guess-FIT_SIGMA*sigma_guess)) & (binscenters<(mean_guess+FIT_SIGMA*sigma_guess))
+    error_counts=np.sqrt(count)
+    error_counts=np.where(error_counts==0,1,error_counts)
+    
+    # PARAMETER BOUNDS ARE NOT USED FOR NOW
+    param_bounds=([-np.inf,-np.inf,-np.inf], [np.inf,np.inf,np.inf])
+    popt, pcov = curve_fit(gaussian,binscenters[mask],count[mask],p0=[np.max(count),mean_guess,sigma_guess],bounds=param_bounds)
+        
+    ax.plot(binscenters[mask], gaussian(binscenters[mask], *popt), color='red',linestyle='dashed', linewidth=2.5, label=r'F')
+    
+    #ax.set_title("Energy = {0} GeV ".format(energy_plot))
+    #ax.set_title(title_head)
+    
+    #ax.set_title("Energy = {0} GeV, $\eta$=3.7".format(energy_plot))
+    ax.xaxis.set_major_locator(MultipleLocator(steps))
+    ax.set_xlabel(xtitle,fontsize=30)
+    ax.set_ylabel("Entries")
+    FigName='Fit_SimEnergy_{0}_{1}.png'.format(energy_plot,particle)
+
+    ### GET MEAN SIGMA AND ERRORS FROM FIT
+    mean=popt[1]
+    std=popt[2]
+    
+  
+    #errors=np.sqrt(np.diag(pcov))
+    mean_error=np.sqrt(pcov[1, 1])
+    std_error=np.sqrt(pcov[2, 2])
+    #print(mean_guess,'   sigma   ', sigma_guess,' actual mean ', mean,  'actual std',std)  
+    ### GET THE BIN WITH VALUE WHERE IT LIES mEAN -3SIGMA
+    two_sig_threshold=mean-(Sigma_For_leakage*std)
+    bin_2sig=np.digitize(two_sig_threshold,bins)
+    
+    ### GET FRACTION OF lEAKAGE
+    num_leak=np.sum(count[0:bin_2sig])
+    deno_leak=np.sum(count)
+    leak_per=(num_leak/deno_leak)*100
+    if leak_per==0:
+        leak_per_error=0
+    else:    
+        leak_per_error=np.sqrt((np.sqrt(num_leak)/num_leak)**2 + (np.sqrt(deno_leak)/deno_leak)**2)*leak_per
+
+    resolution=(std/mean)
+    resolution_error=(np.sqrt((std_error/std)**2 + (mean_error/mean)**2))*resolution
+        
+    #mean=f'{mean:.2f}'
+    mean=format(mean,'.2f')
+    mean_error='{0:.3f}'.format(mean_error)
+    
+    std= '{0:.2f}'.format(std)
+    std_error= '{0:.3f}'.format( std_error)
+
+    leak_per= '{0:.3f}'.format(leak_per)
+    leak_per_error='{0:.4f}'.format(leak_per_error)
+    
+    resolution = '{0:.2f}'.format(resolution)
+    resolution_error ='{0:.4f}'.format(resolution_error)
+    
+    
+    
+    ratio_ene=float(mean)/float(energy_plot)
+    ratio_ene='{0:.2f}'.format(ratio_ene)
+    ratio_ene=float(ratio_ene)
+    ax.text(80,250,"Resolution={0}" .format(resolution))
+    ax.text(80,300,r'$\frac{Pred_{E}}{Truth_{E}}$ =' + '{0:.2f}'.format(ratio_ene))
+    #plt.text(80,300,r"$\frac{Pred_{E}}{Truth_{E}}$= {0:.2f}".format(ratio_ene))
+    ####### PRINT THE VERTICLE LINE WITH 2 SIGMA ################    
+    #ax.vlines([two_sig_threshold,  two_sig_threshold],0, np.max(count),linestyles='dashed', colors='m', linewidth=5)
+   
+ 
+    #ax.tick_params('both', length=20, width=2, which='major')
+    #ax.tick_params('both', length=10, width=1, which='minor')
+    plt.savefig(f"{PathToPlot}{FigName}")
+    
+    plt.show()
+    return mean, std, mean_error, std_error, leak_per,leak_per_error,resolution,resolution_error
+    
+
+
+
+    
